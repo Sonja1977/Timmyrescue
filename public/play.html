@@ -688,7 +688,7 @@ function loop() {
         hp-=dmg; T.invincible=62; T.squish=1.4;
         T.vy+=(Math.random()-.5)*9; combo=0;
         spawnHit(T.x,T.y); updateHUD();
-        if (hp<=0) { S='dead'; return; }
+        if (hp<=0) { S='dead'; requestAnimationFrame(overlayLoop); return; }
         break;
       }
     }
@@ -696,8 +696,8 @@ function loop() {
 
   // Level complete check
   if (!endlessMode && levelProgress >= lv.dist) {
-    if (lvlNum<2) { S='levelclear'; return; }
-    else { S='win'; return; }
+    if (lvlNum<2) { S='levelclear'; requestAnimationFrame(overlayLoop); return; }
+    else { S='win'; requestAnimationFrame(overlayLoop); return; }
   }
 
   drawParticles(); drawObstacles(); drawTimmy();
