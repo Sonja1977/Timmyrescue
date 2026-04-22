@@ -1,0 +1,11 @@
+[build]
+  functions = "netlify/functions"
+  publish = "public"
+
+[[redirects]]
+  from = "/play.html"
+  to = "/play.html"
+  status = 200
+
+[functions]
+  node_bundler = "esbuild"

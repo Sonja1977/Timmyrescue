@@ -1,0 +1,8 @@
+{
+  "name": "timmy-rescue-site",
+  "version": "1.0.0",
+  "description": "Rette Timmy – Buckelwal Browser Game",
+  "dependencies": {
+    "stripe": "^14.0.0"
+  }
+}
