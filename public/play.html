@@ -31,6 +31,8 @@
   #score-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
   #score-val{font-size:24px;font-weight:900;color:#fff;letter-spacing:-.03em;text-shadow:0 2px 16px rgba(0,0,0,.5)}
   #level-info{font-size:11px;font-weight:700;color:rgba(255,255,255,.5);letter-spacing:.08em;text-transform:uppercase;text-align:right;line-height:1.4}
+  #mute-btn{position:absolute;bottom:22px;right:16px;background:rgba(255,255,255,0.1);border:none;border-radius:50%;width:34px;height:34px;font-size:16px;cursor:pointer;z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:all;transition:background .2s;}
+  #mute-btn:hover{background:rgba(255,255,255,0.2)}
   #combo-msg{position:absolute;top:90px;width:100%;text-align:center;font-size:18px;font-weight:800;color:#fbbf24;text-shadow:0 0 20px rgba(251,191,36,.6);pointer-events:none;opacity:0;transition:opacity .3s;z-index:20}
   #toast{position:absolute;bottom:80px;width:100%;text-align:center;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);pointer-events:none;z-index:20;opacity:0;transition:opacity .4s}
 </style>
@@ -51,6 +53,7 @@
     </div>
     <div id="combo-msg"></div>
     <div id="toast"></div>
+    <button id="mute-btn" onclick="toggleMute()">🔊</button>
   </div>
 </div>
 
@@ -735,6 +738,83 @@ function overlayLoop() {
   requestAnimationFrame(overlayLoop);
 }
 
+// ── AUDIO ENGINE ──────────────────────────────────────────
+let audioCtx=null,musicNodes=[],musicStarted=false,masterGain=null,muted=false;
+
+function startMusic(){
+  if(musicStarted)return;
+  musicStarted=true;
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  masterGain=audioCtx.createGain();
+  masterGain.gain.setValueAtTime(0,audioCtx.currentTime);
+  masterGain.gain.linearRampToValueAtTime(0.5,audioCtx.currentTime+3);
+  masterGain.connect(audioCtx.destination);
+
+  // Deep ocean drones
+  [[55,0.4,0],[82.5,0.22,5],[110,0.14,-3]].forEach(([freq,gain,det])=>{
+    const osc=audioCtx.createOscillator(),g=audioCtx.createGain(),f=audioCtx.createBiquadFilter();
+    osc.type='sine';osc.frequency.value=freq;osc.detune.value=det;
+    f.type='lowpass';f.frequency.value=400;g.gain.value=gain;
+    osc.connect(f);f.connect(g);g.connect(masterGain);osc.start();
+    const lfo=audioCtx.createOscillator(),lg=audioCtx.createGain();
+    lfo.frequency.value=0.07+Math.random()*0.05;lg.gain.value=freq*0.012;
+    lfo.connect(lg);lg.connect(osc.frequency);lfo.start();
+    musicNodes.push(osc,lfo);
+  });
+
+  // Gentle melody
+  const mel=[261.6,293.7,329.6,392.0,440.0,392.0,349.2,329.6];
+  let ms=0;
+  function playNote(){
+    if(!audioCtx||audioCtx.state==='closed')return;
+    const osc=audioCtx.createOscillator(),g=audioCtx.createGain(),f=audioCtx.createBiquadFilter();
+    f.type='bandpass';f.frequency.value=800;f.Q.value=0.8;
+    osc.type='sine';osc.frequency.value=mel[ms%mel.length]*0.5;
+    g.gain.setValueAtTime(0,audioCtx.currentTime);
+    g.gain.linearRampToValueAtTime(0.1,audioCtx.currentTime+0.3);
+    g.gain.linearRampToValueAtTime(0,audioCtx.currentTime+2.5);
+    osc.connect(f);f.connect(g);g.connect(masterGain);
+    osc.start();osc.stop(audioCtx.currentTime+2.8);ms++;
+    setTimeout(playNote,1800+Math.random()*1400);
+  }
+  setTimeout(playNote,1200);
+
+  // Shimmer pads
+  [528,612].forEach(baseFreq=>{
+    const osc=audioCtx.createOscillator(),g=audioCtx.createGain(),f=audioCtx.createBiquadFilter();
+    osc.type='triangle';osc.frequency.value=baseFreq+Math.random()*60;
+    f.type='highpass';f.frequency.value=400;g.gain.value=0.04;
+    osc.connect(f);f.connect(g);g.connect(masterGain);osc.start();
+    const trem=audioCtx.createOscillator(),tg=audioCtx.createGain();
+    trem.frequency.value=0.12+Math.random()*0.1;tg.gain.value=0.03;
+    trem.connect(tg);tg.connect(g.gain);trem.start();
+    musicNodes.push(osc,trem);
+  });
+
+  // Wave swooshes
+  function makeWave(){
+    if(!audioCtx||audioCtx.state==='closed')return;
+    const sz=audioCtx.sampleRate*1.5,buf=audioCtx.createBuffer(1,sz,audioCtx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<sz;i++)d[i]=(Math.random()*2-1)*Math.sin(i/sz*Math.PI);
+    const src=audioCtx.createBufferSource(),g=audioCtx.createGain(),f=audioCtx.createBiquadFilter();
+    f.type='lowpass';f.frequency.value=280+Math.random()*180;src.buffer=buf;
+    g.gain.setValueAtTime(0,audioCtx.currentTime);
+    g.gain.linearRampToValueAtTime(0.055,audioCtx.currentTime+0.4);
+    g.gain.linearRampToValueAtTime(0,audioCtx.currentTime+1.5);
+    src.connect(f);f.connect(g);g.connect(masterGain);src.start();
+    setTimeout(makeWave,3000+Math.random()*4000);
+  }
+  setTimeout(makeWave,2000);
+}
+
+function toggleMute(){
+  if(!masterGain)return;
+  muted=!muted;
+  masterGain.gain.linearRampToValueAtTime(muted?0:0.5,audioCtx.currentTime+0.3);
+  document.getElementById('mute-btn').textContent=muted?'🔇':'🔊';
+}
+
 // ── INPUT ─────────────────────────────────────────────────
 function onTap(e) {
   e.preventDefault();
@@ -743,6 +823,7 @@ function onTap(e) {
   const relY=cy/rect.height*H;
 
   if (S==='title') {
+    startMusic();
     endlessMode=false; lvlNum=0; initLevel(0); S='playing';
     requestAnimationFrame(loop); return;
   }
