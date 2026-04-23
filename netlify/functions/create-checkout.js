@@ -2,7 +2,6 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const crypto = require('crypto');
 
 function generateCode() {
-  // Generate a readable code like TIMMY-A3F9-X7K2
   const part1 = crypto.randomBytes(2).toString('hex').toUpperCase();
   const part2 = crypto.randomBytes(2).toString('hex').toUpperCase();
   return `TIMMY-${part1}-${part2}`;
@@ -15,6 +14,7 @@ exports.handler = async (event) => {
 
   try {
     const accessCode = generateCode();
+    console.log(`Generated code: ${accessCode}`);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'paypal'],
@@ -31,18 +31,14 @@ exports.handler = async (event) => {
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${process.env.URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+      // Pass code directly in success URL so we don't need to look it up
+      success_url: `${process.env.URL}/success.html?session_id={CHECKOUT_SESSION_ID}&code=${accessCode}`,
       cancel_url: `${process.env.URL}/`,
       locale: 'de',
       metadata: { accessCode },
-      // Stripe sends a confirmation email automatically with the receipt
-      // We add the access code in the custom fields shown on receipt
-      custom_text: {
-        after_submit: {
-          message: `Dein persönlicher Zugangscode: ${accessCode} — Bitte speichere diesen Code! Du kannst ihn jederzeit auf timmyrescue.netlify.app eingeben um das Spiel zu starten.`
-        }
-      }
     });
+
+    console.log(`Session created: ${session.id} with code: ${accessCode}`);
 
     return {
       statusCode: 200,

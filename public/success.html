@@ -101,38 +101,42 @@ function animConf(){
 }
 animConf();
 
-// Get access code from Stripe session
+// Get access code directly from URL (most reliable method)
 let accessCode = '';
 
 async function loadCode() {
   const params = new URLSearchParams(window.location.search);
+  const codeFromUrl = params.get('code');
   const sessionId = params.get('session_id');
 
-  if (!sessionId) {
-    document.getElementById('code-display').innerHTML = '❌ Kein Session-Code gefunden';
-    return;
-  }
-
-  try {
-    const res = await fetch('/.netlify/functions/get-access-code', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ sessionId })
-    });
-    const data = await res.json();
-
-    if (data.code) {
-      accessCode = data.code;
-      document.getElementById('code-display').textContent = accessCode;
-      document.getElementById('copy-btn').style.display = 'inline-block';
-      // Save to localStorage as fallback
-      localStorage.setItem('timmy_access', accessCode);
-      localStorage.setItem('timmy_session', sessionId);
-    } else {
-      document.getElementById('code-display').innerHTML = '⚠️ Code konnte nicht geladen werden.<br><small style="font-size:14px">Bitte prüfe deine Stripe-E-Mail.</small>';
+  if (codeFromUrl && codeFromUrl.startsWith('TIMMY-')) {
+    // Code is directly in URL - use it immediately
+    accessCode = codeFromUrl.trim().toUpperCase();
+    document.getElementById('code-display').textContent = accessCode;
+    document.getElementById('copy-btn').style.display = 'inline-block';
+    localStorage.setItem('timmy_access', accessCode);
+  } else if (sessionId) {
+    // Fallback: try to get code from Stripe
+    try {
+      const res = await fetch('/.netlify/functions/get-access-code', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ sessionId })
+      });
+      const data = await res.json();
+      if (data.code) {
+        accessCode = data.code;
+        document.getElementById('code-display').textContent = accessCode;
+        document.getElementById('copy-btn').style.display = 'inline-block';
+        localStorage.setItem('timmy_access', accessCode);
+      } else {
+        document.getElementById('code-display').innerHTML = '⚠️ Code konnte nicht geladen werden.<br><small style="font-size:14px">Bitte prüfe deine Stripe-E-Mail.</small>';
+      }
+    } catch(e) {
+      document.getElementById('code-display').innerHTML = '⚠️ Verbindungsfehler.<br><small style="font-size:14px">Bitte prüfe deine Stripe-E-Mail.</small>';
     }
-  } catch(e) {
-    document.getElementById('code-display').innerHTML = '⚠️ Verbindungsfehler.<br><small style="font-size:14px">Bitte prüfe deine Stripe-E-Mail.</small>';
+  } else {
+    document.getElementById('code-display').innerHTML = '❌ Kein Code gefunden';
   }
 }
 
