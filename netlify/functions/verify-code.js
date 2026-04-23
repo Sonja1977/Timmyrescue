@@ -17,55 +17,38 @@ exports.handler = async (event) => {
       };
     }
 
-    // Search through multiple pages of Stripe sessions
+    // Search through ALL Stripe sessions using auto-pagination
     let found = false;
-    let hasMore = true;
-    let startingAfter = undefined;
-
-    while (hasMore && !found) {
-      const params = { limit: 100 };
-      if (startingAfter) params.starting_after = startingAfter;
-
-      const sessions = await stripe.checkout.sessions.list(params);
-
-      for (const s of sessions.data) {
+    let page = await stripe.checkout.sessions.list({ limit: 100 });
+    
+    while (true) {
+      for (const s of page.data) {
         const sessionCode = (s.metadata?.accessCode || '').trim().toUpperCase();
+        console.log(`Checking session ${s.id}: code="${sessionCode}" status="${s.payment_status}"`);
         if (sessionCode === cleanCode && s.payment_status === 'paid') {
           found = true;
           break;
         }
       }
-
-      hasMore = sessions.has_more;
-      if (sessions.data.length > 0) {
-        startingAfter = sessions.data[sessions.data.length - 1].id;
-      } else {
-        hasMore = false;
-      }
-
-      // Safety: max 5 pages (500 sessions)
-      if (startingAfter && sessions.data.length < 100) hasMore = false;
+      
+      if (found || !page.has_more) break;
+      page = await stripe.checkout.sessions.list({ limit: 100, starting_after: page.data[page.data.length - 1].id });
     }
 
-    if (found) {
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ valid: true }),
-      };
-    } else {
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ valid: false, error: 'Code nicht gefunden. Bitte prüfe ob du ihn korrekt eingegeben hast.' }),
-      };
-    }
+    console.log(`Code ${cleanCode} found: ${found}`);
+
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ valid: found, error: found ? null : 'Code nicht gefunden. Bitte prüfe ob du ihn korrekt eingegeben hast.' }),
+    };
+
   } catch (error) {
     console.error('Verify error:', error);
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ valid: false, error: 'Serverfehler – bitte versuche es nochmal' }),
+      body: JSON.stringify({ valid: false, error: 'Serverfehler: ' + error.message }),
     };
   }
 };
