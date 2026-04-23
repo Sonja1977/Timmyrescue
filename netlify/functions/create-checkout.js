@@ -14,7 +14,6 @@ exports.handler = async (event) => {
 
   try {
     const accessCode = generateCode();
-    console.log(`Generated code: ${accessCode}`);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'paypal'],
@@ -24,21 +23,23 @@ exports.handler = async (event) => {
           product_data: {
             name: 'Rette Timmy! 🐋',
             description: 'Das Ostsee-Buckelwal-Browserspiel – 3 Level + Endless-Modus',
-            images: [],
           },
           unit_amount: 99,
         },
         quantity: 1,
       }],
       mode: 'payment',
-      // Pass code directly in success URL so we don't need to look it up
-      success_url: `${process.env.URL}/success.html?session_id={CHECKOUT_SESSION_ID}&code=${accessCode}`,
+      success_url: `${process.env.URL}/success.html?code=${accessCode}`,
       cancel_url: `${process.env.URL}/`,
       locale: 'de',
       metadata: { accessCode },
     });
 
-    console.log(`Session created: ${session.id} with code: ${accessCode}`);
+    // Save code to Netlify Blobs immediately
+    const { getStore } = require('@netlify/blobs');
+    const store = getStore('timmy-codes');
+    await store.set(accessCode, 'valid');
+    console.log(`Saved code to Blobs: ${accessCode}`);
 
     return {
       statusCode: 200,
@@ -46,7 +47,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ url: session.url }),
     };
   } catch (error) {
-    console.error('Stripe error:', error);
+    console.error('Error:', error);
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },

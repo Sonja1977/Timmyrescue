@@ -1,5 +1,3 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
@@ -17,32 +15,22 @@ exports.handler = async (event) => {
       };
     }
 
-    // Search through ALL Stripe sessions using auto-pagination
-    let found = false;
-    let page = await stripe.checkout.sessions.list({ limit: 100 });
-    
-    while (true) {
-      for (const s of page.data) {
-        const sessionCode = (s.metadata?.accessCode || '').trim().toUpperCase();
-        console.log(`Checking session ${s.id}: code="${sessionCode}" status="${s.payment_status}"`);
-        if (sessionCode === cleanCode && s.payment_status === 'paid') {
-          found = true;
-          break;
-        }
-      }
-      
-      if (found || !page.has_more) break;
-      page = await stripe.checkout.sessions.list({ limit: 100, starting_after: page.data[page.data.length - 1].id });
-    }
+    // Check Netlify Blobs
+    const { getStore } = require('@netlify/blobs');
+    const store = getStore('timmy-codes');
+    const value = await store.get(cleanCode);
+    console.log(`Checking code ${cleanCode}: ${value}`);
 
-    console.log(`Code ${cleanCode} found: ${found}`);
+    const valid = value === 'valid';
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ valid: found, error: found ? null : 'Code nicht gefunden. Bitte prüfe ob du ihn korrekt eingegeben hast.' }),
+      body: JSON.stringify({ 
+        valid, 
+        error: valid ? null : 'Code nicht gefunden. Bitte prüfe ob du ihn korrekt eingegeben hast.'
+      }),
     };
-
   } catch (error) {
     console.error('Verify error:', error);
     return {
