@@ -747,65 +747,84 @@ function startMusic(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   masterGain=audioCtx.createGain();
   masterGain.gain.setValueAtTime(0,audioCtx.currentTime);
-  masterGain.gain.linearRampToValueAtTime(0.5,audioCtx.currentTime+3);
+  masterGain.gain.linearRampToValueAtTime(0.35,audioCtx.currentTime+4);
   masterGain.connect(audioCtx.destination);
 
-  // Deep ocean drones
-  [[55,0.4,0],[82.5,0.22,5],[110,0.14,-3]].forEach(([freq,gain,det])=>{
-    const osc=audioCtx.createOscillator(),g=audioCtx.createGain(),f=audioCtx.createBiquadFilter();
-    osc.type='sine';osc.frequency.value=freq;osc.detune.value=det;
-    f.type='lowpass';f.frequency.value=400;g.gain.value=gain;
-    osc.connect(f);f.connect(g);g.connect(masterGain);osc.start();
-    const lfo=audioCtx.createOscillator(),lg=audioCtx.createGain();
-    lfo.frequency.value=0.07+Math.random()*0.05;lg.gain.value=freq*0.012;
-    lfo.connect(lg);lg.connect(osc.frequency);lfo.start();
-    musicNodes.push(osc,lfo);
-  });
+  const sr=audioCtx.sampleRate;
 
-  // Gentle melody
-  const mel=[261.6,293.7,329.6,392.0,440.0,392.0,349.2,329.6];
-  let ms=0;
-  function playNote(){
+  // ── Continuous ocean noise base ──
+  // White noise source
+  const bufLen=sr*4;
+  const noiseBuf=audioCtx.createBuffer(1,bufLen,sr);
+  const nd=noiseBuf.getChannelData(0);
+  for(let i=0;i<bufLen;i++) nd[i]=Math.random()*2-1;
+
+  const noiseNode=audioCtx.createBufferSource();
+  noiseNode.buffer=noiseBuf;
+  noiseNode.loop=true;
+
+  // Shape noise into ocean sound: lowpass for that soft ocean rumble
+  const lp1=audioCtx.createBiquadFilter();
+  lp1.type='lowpass'; lp1.frequency.value=520; lp1.Q.value=0.7;
+
+  const lp2=audioCtx.createBiquadFilter();
+  lp2.type='lowpass'; lp2.frequency.value=280; lp2.Q.value=0.5;
+
+  const hp=audioCtx.createBiquadFilter();
+  hp.type='highpass'; hp.frequency.value=60; hp.Q.value=0.5;
+
+  const noiseGain=audioCtx.createGain();
+  noiseGain.gain.value=0.55;
+
+  noiseNode.connect(hp);
+  hp.connect(lp1);
+  lp1.connect(lp2);
+  lp2.connect(noiseGain);
+  noiseGain.connect(masterGain);
+  noiseNode.start();
+  musicNodes.push(noiseNode);
+
+  // ── Slow wave swell: LFO that makes the volume rise and fall like waves ──
+  const waveGain=audioCtx.createGain();
+  waveGain.gain.value=0.5;
+  noiseGain.disconnect(masterGain);
+  noiseGain.connect(waveGain);
+  waveGain.connect(masterGain);
+
+  // Animate wave swell manually for smooth organic feel
+  let wavePhase=0;
+  function animateWaves(){
     if(!audioCtx||audioCtx.state==='closed')return;
-    const osc=audioCtx.createOscillator(),g=audioCtx.createGain(),f=audioCtx.createBiquadFilter();
-    f.type='bandpass';f.frequency.value=800;f.Q.value=0.8;
-    osc.type='sine';osc.frequency.value=mel[ms%mel.length]*0.5;
-    g.gain.setValueAtTime(0,audioCtx.currentTime);
-    g.gain.linearRampToValueAtTime(0.1,audioCtx.currentTime+0.3);
-    g.gain.linearRampToValueAtTime(0,audioCtx.currentTime+2.5);
-    osc.connect(f);f.connect(g);g.connect(masterGain);
-    osc.start();osc.stop(audioCtx.currentTime+2.8);ms++;
-    setTimeout(playNote,1800+Math.random()*1400);
+    wavePhase+=0.004;
+    // Combine two sine waves for irregular wave rhythm
+    const swell=0.45 + 0.35*Math.sin(wavePhase) + 0.2*Math.sin(wavePhase*1.7+1.2);
+    waveGain.gain.setTargetAtTime(Math.max(0.05,swell),audioCtx.currentTime,0.3);
+    requestAnimationFrame(animateWaves);
   }
-  setTimeout(playNote,1200);
+  animateWaves();
 
-  // Shimmer pads
-  [528,612].forEach(baseFreq=>{
-    const osc=audioCtx.createOscillator(),g=audioCtx.createGain(),f=audioCtx.createBiquadFilter();
-    osc.type='triangle';osc.frequency.value=baseFreq+Math.random()*60;
-    f.type='highpass';f.frequency.value=400;g.gain.value=0.04;
-    osc.connect(f);f.connect(g);g.connect(masterGain);osc.start();
-    const trem=audioCtx.createOscillator(),tg=audioCtx.createGain();
-    trem.frequency.value=0.12+Math.random()*0.1;tg.gain.value=0.03;
-    trem.connect(tg);tg.connect(g.gain);trem.start();
-    musicNodes.push(osc,trem);
-  });
-
-  // Wave swooshes
-  function makeWave(){
+  // ── Occasional distant gentle splash ──
+  function makeSplash(){
     if(!audioCtx||audioCtx.state==='closed')return;
-    const sz=audioCtx.sampleRate*1.5,buf=audioCtx.createBuffer(1,sz,audioCtx.sampleRate);
-    const d=buf.getChannelData(0);
-    for(let i=0;i<sz;i++)d[i]=(Math.random()*2-1)*Math.sin(i/sz*Math.PI);
-    const src=audioCtx.createBufferSource(),g=audioCtx.createGain(),f=audioCtx.createBiquadFilter();
-    f.type='lowpass';f.frequency.value=280+Math.random()*180;src.buffer=buf;
+    const splashBuf=audioCtx.createBuffer(1,sr*0.8,sr);
+    const sd=splashBuf.getChannelData(0);
+    for(let i=0;i<sr*0.8;i++){
+      const env=Math.sin(i/(sr*0.8)*Math.PI);
+      sd[i]=(Math.random()*2-1)*env*env;
+    }
+    const src=audioCtx.createBufferSource();
+    src.buffer=splashBuf;
+    const f=audioCtx.createBiquadFilter();
+    f.type='bandpass'; f.frequency.value=600+Math.random()*300; f.Q.value=1.2;
+    const g=audioCtx.createGain();
     g.gain.setValueAtTime(0,audioCtx.currentTime);
-    g.gain.linearRampToValueAtTime(0.055,audioCtx.currentTime+0.4);
-    g.gain.linearRampToValueAtTime(0,audioCtx.currentTime+1.5);
-    src.connect(f);f.connect(g);g.connect(masterGain);src.start();
-    setTimeout(makeWave,3000+Math.random()*4000);
+    g.gain.linearRampToValueAtTime(0.08+Math.random()*0.06,audioCtx.currentTime+0.05);
+    g.gain.linearRampToValueAtTime(0,audioCtx.currentTime+0.75);
+    src.connect(f); f.connect(g); g.connect(masterGain);
+    src.start();
+    setTimeout(makeSplash, 5000+Math.random()*8000);
   }
-  setTimeout(makeWave,2000);
+  setTimeout(makeSplash, 3000);
 }
 
 function toggleMute(){
