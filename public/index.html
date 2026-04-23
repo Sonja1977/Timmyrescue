@@ -145,6 +145,33 @@ nav{padding:20px 0;display:flex;justify-content:center}
 }
 .trust-item{display:flex;align-items:center;gap:5px}
 
+/* Code entry */
+.divider{display:flex;align-items:center;gap:10px;margin:20px 0 0;color:var(--text-muted);font-size:12px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.08)}
+.code-section{margin-top:4px}
+.code-toggle{background:none;border:none;color:rgba(52,211,153,0.6);font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;cursor:pointer;width:100%;padding:10px 0;transition:color .2s}
+.code-toggle:hover{color:var(--teal)}
+.code-entry{display:none;padding-top:4px}
+.code-entry.open{display:block}
+.code-input-field{
+  width:100%;padding:13px 16px;font-size:15px;font-weight:700;
+  font-family:'Nunito',sans-serif;letter-spacing:.06em;text-transform:uppercase;
+  background:rgba(13,48,96,0.5);border:1.5px solid rgba(52,211,153,0.25);
+  border-radius:12px;color:#fff;text-align:center;margin-bottom:10px;
+  outline:none;transition:border-color .2s;
+}
+.code-input-field:focus{border-color:rgba(52,211,153,0.6)}
+.code-input-field::placeholder{color:rgba(255,255,255,.25);text-transform:none;font-weight:600;letter-spacing:0}
+.btn-code{
+  display:block;width:100%;padding:14px;
+  background:rgba(52,211,153,0.12);border:1.5px solid rgba(52,211,153,0.3);
+  color:var(--teal);font-family:'Nunito',sans-serif;font-size:15px;font-weight:800;
+  border-radius:12px;cursor:pointer;transition:background .2s,transform .15s;
+}
+.btn-code:hover{background:rgba(52,211,153,0.2);transform:translateY(-1px)}
+.btn-code:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.code-error{font-size:12px;color:#f87171;min-height:16px;margin-bottom:8px;text-align:center}
+
 /* ── FEATURES ── */
 .features{margin:0 auto 48px;animation:fadeUp .6s .4s ease both}
 .features h2{
@@ -271,6 +298,16 @@ footer a{color:rgba(52,211,153,.5);text-decoration:none}
       <span class="trust-item">🔒 Sichere Zahlung</span>
       <span class="trust-item">⚡ Sofort-Zugang</span>
       <span class="trust-item">💳 Stripe</span>
+    </div>
+
+    <div class="divider">oder</div>
+    <div class="code-section">
+      <button class="code-toggle" onclick="toggleCodeEntry()">🎮 Ich habe bereits einen Code</button>
+      <div class="code-entry" id="codeEntry">
+        <input class="code-input-field" id="codeField" type="text" placeholder="z.B. TIMMY-A3F9-X7K2" maxlength="14" oninput="this.value=this.value.toUpperCase()">
+        <div class="code-error" id="codeError"></div>
+        <button class="btn-code" id="codeBtn" onclick="redeemCode()">✅ Code einlösen & spielen</button>
+      </div>
     </div>
   </div>
 
@@ -439,6 +476,57 @@ async function startCheckout() {
     btn.innerHTML = '<span>❌ Fehler – nochmal versuchen</span>';
     btn.disabled = false;
     console.error(e);
+  }
+}
+
+// ── CODE ENTRY ──
+function toggleCodeEntry() {
+  const entry = document.getElementById('codeEntry');
+  entry.classList.toggle('open');
+  if (entry.classList.contains('open')) {
+    setTimeout(() => document.getElementById('codeField').focus(), 100);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const field = document.getElementById('codeField');
+  if (field) field.addEventListener('keydown', e => { if (e.key === 'Enter') redeemCode(); });
+});
+
+async function redeemCode() {
+  const code = document.getElementById('codeField').value.trim().toUpperCase();
+  const errEl = document.getElementById('codeError');
+  const btn = document.getElementById('codeBtn');
+
+  if (!code || code.length < 10) {
+    errEl.textContent = 'Bitte gib deinen vollständigen Code ein.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Prüfe Code…';
+  errEl.textContent = '';
+
+  try {
+    const res = await fetch('/.netlify/functions/verify-code', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+
+    if (data.valid) {
+      localStorage.setItem('timmy_access', code);
+      window.location.href = '/play.html';
+    } else {
+      errEl.textContent = data.error || 'Ungültiger Code. Bitte prüfe deine E-Mail.';
+      btn.disabled = false;
+      btn.textContent = '✅ Code einlösen & spielen';
+    }
+  } catch(e) {
+    errEl.textContent = 'Verbindungsfehler. Bitte versuche es nochmal.';
+    btn.disabled = false;
+    btn.textContent = '✅ Code einlösen & spielen';
   }
 }
 </script>
