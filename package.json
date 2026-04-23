@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Rette Timmy – Buckelwal Browser Game",
   "dependencies": {
-    "stripe": "^14.0.0"
+    "stripe": "^14.0.0",
+    "@netlify/blobs": "^7.0.0"
   }
 }
