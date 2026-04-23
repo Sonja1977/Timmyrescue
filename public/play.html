@@ -2,12 +2,8 @@
 <html lang="de">
 <!-- PAYWALL CHECK -->
 <script>
-(function(){
-  var access = localStorage.getItem("timmy_access");
-  if (!access) {
-    document.addEventListener("DOMContentLoaded", showCodeEntry);
-  }
-})();
+// Check access early – will show code entry after DOM loads
+window._hasAccess = !!localStorage.getItem("timmy_access");
 </script>
 <head>
 <meta charset="UTF-8">
@@ -917,9 +913,6 @@ cv.addEventListener('click', onTap);
 cv.addEventListener('touchstart', onTap, {passive:false});
 
 // ── CODE ENTRY ────────────────────────────────────────────
-function showCodeEntry() {
-  document.getElementById('code-overlay').style.display = 'flex';
-}
 
 async function submitCode() {
   const input = document.getElementById('code-input');
@@ -971,15 +964,23 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── START ─────────────────────────────────────────────────
-const savedCode = localStorage.getItem('timmy_access');
-if (savedCode) {
-  // Already has access – start game directly
+function startGame() {
   S='title'; fr=0;
   requestAnimationFrame(overlayLoop);
+}
+
+function showCodeEntry() {
+  const overlay = document.getElementById('code-overlay');
+  if (overlay) overlay.style.display = 'flex';
+}
+
+if (window._hasAccess) {
+  // Already has saved code – start directly
+  window.addEventListener('DOMContentLoaded', startGame);
+  if (document.readyState !== 'loading') startGame();
 } else {
-  // Show code entry
-  document.addEventListener('DOMContentLoaded', showCodeEntry);
-  // Fallback if DOM already loaded
+  // No saved code – show code entry screen
+  window.addEventListener('DOMContentLoaded', showCodeEntry);
   if (document.readyState !== 'loading') showCodeEntry();
 }
 </script>
