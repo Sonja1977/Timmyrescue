@@ -7,8 +7,8 @@ module.exports = async (req, res) => {
     const { code } = req.body;
     const cleanCode = (code || '').trim().toUpperCase();
 
-    // Validate format: TIMMY-XXXX-XXXX (14 chars total)
-    const codeRegex = /^TIMMY-[A-F0-9]{4}-[A-F0-9]{4}$/;
+    // Validate format: TIMMY-XXXX-XXXX
+    const codeRegex = /^TIMMY-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
     const valid = codeRegex.test(cleanCode);
 
     return res.status(200).json({
