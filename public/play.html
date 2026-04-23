@@ -2,7 +2,6 @@
 <html lang="de">
 <!-- PAYWALL CHECK -->
 <script>
-// Check access early – will show code entry after DOM loads
 window._hasAccess = !!localStorage.getItem("timmy_access");
 </script>
 <head>
@@ -82,7 +81,7 @@ window._hasAccess = !!localStorage.getItem("timmy_access");
     <div id="combo-msg"></div>
     <div id="toast"></div>
     <button id="mute-btn" onclick="toggleMute()">🔊</button>
-    <div id="code-overlay" style="display:none">
+    <div id="code-overlay">
       <div style="font-size:44px;margin-bottom:12px">🐋</div>
       <h2>Zugangscode eingeben</h2>
       <p>Du hast deinen Code per E-Mail erhalten,<br>nachdem du das Spiel gekauft hast.</p>
@@ -939,10 +938,7 @@ async function submitCode() {
 
     if (data.valid) {
       localStorage.setItem('timmy_access', code);
-      document.getElementById('code-overlay').style.display = 'none';
-      // Start game
-      S = 'title'; fr = 0;
-      requestAnimationFrame(overlayLoop);
+      startGame();
     } else {
       errEl.textContent = data.error || 'Ungültiger Code. Bitte prüfe deine E-Mail.';
       btn.disabled = false;
@@ -965,6 +961,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── START ─────────────────────────────────────────────────
 function startGame() {
+  const overlay = document.getElementById('code-overlay');
+  if (overlay) overlay.style.display = 'none';
   S='title'; fr=0;
   requestAnimationFrame(overlayLoop);
 }
@@ -974,15 +972,14 @@ function showCodeEntry() {
   if (overlay) overlay.style.display = 'flex';
 }
 
-if (window._hasAccess) {
-  // Already has saved code – start directly
-  window.addEventListener('DOMContentLoaded', startGame);
-  if (document.readyState !== 'loading') startGame();
-} else {
-  // No saved code – show code entry screen
-  window.addEventListener('DOMContentLoaded', showCodeEntry);
-  if (document.readyState !== 'loading') showCodeEntry();
-}
+// Run after DOM is fully ready
+window.addEventListener('DOMContentLoaded', function() {
+  if (window._hasAccess) {
+    startGame();
+  } else {
+    showCodeEntry();
+  }
+});
 </script>
 </body>
 </html>
