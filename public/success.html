@@ -10,62 +10,143 @@
 body{background:#040d1a;color:#e8f0fe;font-family:'Nunito',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;overflow:hidden}
 body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(52,211,153,0.08) 0%,transparent 70%);pointer-events:none}
 .card{max-width:440px;width:100%;text-align:center;position:relative;z-index:1}
-.emoji{font-size:64px;margin-bottom:16px;animation:pop .5s cubic-bezier(.34,1.56,.64,1) both}
+.emoji{font-size:56px;margin-bottom:16px;animation:pop .5s cubic-bezier(.34,1.56,.64,1) both}
 @keyframes pop{from{transform:scale(0) rotate(-15deg)}to{transform:scale(1) rotate(0)}}
-h1{font-family:'Playfair Display',serif;font-size:34px;font-weight:900;margin-bottom:10px;color:#34d399}
-.sub{font-size:15px;color:rgba(200,220,255,0.6);line-height:1.6;margin-bottom:32px}
+h1{font-family:'Playfair Display',serif;font-size:30px;font-weight:900;margin-bottom:10px;color:#34d399}
+.sub{font-size:14px;color:rgba(200,220,255,0.6);line-height:1.6;margin-bottom:28px}
+
+/* Code box */
+.code-box{
+  background:rgba(52,211,153,0.08);
+  border:2px solid rgba(52,211,153,0.35);
+  border-radius:16px;padding:24px;margin-bottom:24px;
+}
+.code-label{font-size:11px;font-weight:800;color:rgba(52,211,153,0.7);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.code-value{
+  font-family:'Playfair Display',serif;
+  font-size:28px;font-weight:900;color:#fff;
+  letter-spacing:.08em;margin-bottom:14px;
+  text-shadow:0 0 30px rgba(52,211,153,0.3);
+}
+.code-note{font-size:12px;color:rgba(200,220,255,0.5);line-height:1.6;margin-bottom:16px}
+.copy-btn{
+  background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.3);
+  color:#34d399;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;
+  padding:8px 20px;border-radius:99px;cursor:pointer;transition:background .2s;
+}
+.copy-btn:hover{background:rgba(52,211,153,0.25)}
+.copy-btn.copied{color:#6ee7b7;border-color:rgba(110,231,183,0.4)}
+
 .btn{
   display:block;width:100%;padding:18px;
   background:linear-gradient(135deg,#059669,#047857);
-  color:#fff;font-family:'Nunito',sans-serif;font-size:18px;font-weight:800;
+  color:#fff;font-family:'Nunito',sans-serif;font-size:17px;font-weight:800;
   border:none;border-radius:14px;cursor:pointer;text-decoration:none;
   box-shadow:0 8px 32px rgba(5,150,105,.4);
-  transition:transform .15s,box-shadow .15s;
-  margin-bottom:16px;
+  transition:transform .15s,box-shadow .15s;margin-bottom:14px;
 }
-.btn:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(5,150,105,.5)}
-.hint{font-size:12px;color:rgba(255,255,255,.3)}
-.confetti{position:fixed;inset:0;pointer-events:none;z-index:0}
+.btn:hover{transform:translateY(-2px)}
+.hint{font-size:12px;color:rgba(255,255,255,.28);line-height:1.6}
+
+.loading{font-size:14px;color:rgba(200,220,255,0.5);padding:20px 0}
+.canvas-conf{position:fixed;inset:0;pointer-events:none;z-index:0}
 </style>
 </head>
 <body>
-<canvas class="confetti" id="confetti"></canvas>
+<canvas class="canvas-conf" id="confetti"></canvas>
 <div class="card">
   <div class="emoji">🎉</div>
   <h1>Zahlung erfolgreich!</h1>
-  <p class="sub">Du hast Zugang zu <strong>Rette Timmy!</strong><br>Klicke jetzt und rette den Buckelwal. Viel Erfolg! 🐋</p>
-  <a href="/play.html" class="btn">🐋 Jetzt spielen</a>
-  <p class="hint">Der Zugang ist in deinem Browser gespeichert.</p>
+  <p class="sub">Willkommen an Bord! Hier ist dein persönlicher Zugangscode:</p>
+
+  <div class="code-box">
+    <div class="code-label">Dein Zugangscode</div>
+    <div class="code-value" id="code-display">
+      <span class="loading">⏳ Wird geladen…</span>
+    </div>
+    <p class="code-note">
+      📧 Dieser Code wurde auch an deine E-Mail geschickt.<br>
+      Speichere ihn – du brauchst ihn um das Spiel jederzeit wieder zu starten!
+    </p>
+    <button class="copy-btn" id="copy-btn" onclick="copyCode()" style="display:none">📋 Code kopieren</button>
+  </div>
+
+  <a href="/play.html" class="btn" id="play-btn">🐋 Jetzt spielen</a>
+  <p class="hint">
+    Nächstes Mal einfach auf <strong style="color:rgba(255,255,255,.45)">timmyrescue.netlify.app</strong> gehen<br>
+    und deinen Code eingeben – auf jedem Gerät!
+  </p>
 </div>
 
 <script>
 // Confetti
-const cv=document.getElementById('confetti'),ctx=cv.getContext('2d');
+const cv=document.getElementById('confetti'),cx=cv.getContext('2d');
 cv.width=window.innerWidth;cv.height=window.innerHeight;
 const cols=['#34d399','#fbbf24','#f87171','#60a5fa','#a78bfa','#fb923c'];
-const pieces=Array.from({length:120},()=>({
-  x:Math.random()*cv.width,y:-10-Math.random()*100,
+const pieces=Array.from({length:100},()=>({
+  x:Math.random()*cv.width,y:-10-Math.random()*80,
   vx:(Math.random()-.5)*3,vy:2+Math.random()*3,
-  r:4+Math.random()*6,col:cols[Math.floor(Math.random()*cols.length)],
-  rot:Math.random()*Math.PI*2,rv:(Math.random()-.5)*.15,life:1
+  r:4+Math.random()*5,col:cols[Math.floor(Math.random()*cols.length)],
+  rot:Math.random()*Math.PI*2,rv:(Math.random()-.5)*.12
 }));
 function animConf(){
-  ctx.clearRect(0,0,cv.width,cv.height);
+  cx.clearRect(0,0,cv.width,cv.height);
   pieces.forEach(p=>{
-    p.x+=p.vx;p.y+=p.vy;p.rot+=p.rv;p.vy+=.05;
+    p.x+=p.vx;p.y+=p.vy;p.rot+=p.rv;p.vy+=.04;
     if(p.y>cv.height+10)p.y=-10;
-    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);
-    ctx.fillStyle=p.col;ctx.globalAlpha=.85;
-    ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r);ctx.restore();
+    cx.save();cx.translate(p.x,p.y);cx.rotate(p.rot);
+    cx.fillStyle=p.col;cx.globalAlpha=.8;cx.fillRect(-p.r/2,-p.r/2,p.r,p.r);cx.restore();
   });
   requestAnimationFrame(animConf);
 }
 animConf();
 
-// Store access token
-const params=new URLSearchParams(window.location.search);
-const session=params.get('session_id');
-if(session){localStorage.setItem('timmy_access',session);}
+// Get access code from Stripe session
+let accessCode = '';
+
+async function loadCode() {
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get('session_id');
+
+  if (!sessionId) {
+    document.getElementById('code-display').innerHTML = '❌ Kein Session-Code gefunden';
+    return;
+  }
+
+  try {
+    const res = await fetch('/.netlify/functions/get-access-code', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ sessionId })
+    });
+    const data = await res.json();
+
+    if (data.code) {
+      accessCode = data.code;
+      document.getElementById('code-display').textContent = accessCode;
+      document.getElementById('copy-btn').style.display = 'inline-block';
+      // Save to localStorage as fallback
+      localStorage.setItem('timmy_access', accessCode);
+      localStorage.setItem('timmy_session', sessionId);
+    } else {
+      document.getElementById('code-display').innerHTML = '⚠️ Code konnte nicht geladen werden.<br><small style="font-size:14px">Bitte prüfe deine Stripe-E-Mail.</small>';
+    }
+  } catch(e) {
+    document.getElementById('code-display').innerHTML = '⚠️ Verbindungsfehler.<br><small style="font-size:14px">Bitte prüfe deine Stripe-E-Mail.</small>';
+  }
+}
+
+function copyCode() {
+  if (!accessCode) return;
+  navigator.clipboard.writeText(accessCode).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✅ Kopiert!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '📋 Code kopieren'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+loadCode();
 </script>
 </body>
 </html>

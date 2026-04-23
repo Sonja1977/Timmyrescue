@@ -1,4 +1,12 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const crypto = require('crypto');
+
+function generateCode() {
+  // Generate a readable code like TIMMY-A3F9-X7K2
+  const part1 = crypto.randomBytes(2).toString('hex').toUpperCase();
+  const part2 = crypto.randomBytes(2).toString('hex').toUpperCase();
+  return `TIMMY-${part1}-${part2}`;
+}
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -6,6 +14,8 @@ exports.handler = async (event) => {
   }
 
   try {
+    const accessCode = generateCode();
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'paypal'],
       line_items: [{
@@ -16,7 +26,7 @@ exports.handler = async (event) => {
             description: 'Das Ostsee-Buckelwal-Browserspiel – 3 Level + Endless-Modus',
             images: [],
           },
-          unit_amount: 99, // 0,99 € in Cent
+          unit_amount: 99,
         },
         quantity: 1,
       }],
@@ -24,6 +34,14 @@ exports.handler = async (event) => {
       success_url: `${process.env.URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.URL}/`,
       locale: 'de',
+      metadata: { accessCode },
+      // Stripe sends a confirmation email automatically with the receipt
+      // We add the access code in the custom fields shown on receipt
+      custom_text: {
+        after_submit: {
+          message: `Dein persönlicher Zugangscode: ${accessCode} — Bitte speichere diesen Code! Du kannst ihn jederzeit auf timmyrescue.netlify.app eingeben um das Spiel zu starten.`
+        }
+      }
     });
 
     return {

@@ -5,7 +5,7 @@
 (function(){
   var access = localStorage.getItem("timmy_access");
   if (!access) {
-    window.location.href = "/";
+    document.addEventListener("DOMContentLoaded", showCodeEntry);
   }
 })();
 </script>
@@ -33,6 +33,38 @@
   #level-info{font-size:11px;font-weight:700;color:rgba(255,255,255,.5);letter-spacing:.08em;text-transform:uppercase;text-align:right;line-height:1.4}
   #mute-btn{position:absolute;bottom:22px;right:16px;background:rgba(255,255,255,0.1);border:none;border-radius:50%;width:34px;height:34px;font-size:16px;cursor:pointer;z-index:20;display:flex;align-items:center;justify-content:center;pointer-events:all;transition:background .2s;}
   #mute-btn:hover{background:rgba(255,255,255,0.2)}
+
+  /* Code entry overlay */
+  #code-overlay{
+    position:absolute;inset:0;background:rgba(4,13,26,0.97);
+    border-radius:20px;z-index:50;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;padding:28px;text-align:center;
+    font-family:'Nunito',sans-serif;
+  }
+  #code-overlay h2{font-size:22px;font-weight:900;color:#e2e8f0;margin-bottom:8px}
+  #code-overlay p{font-size:13px;color:rgba(200,220,255,0.55);margin-bottom:24px;line-height:1.6}
+  #code-input{
+    width:100%;padding:14px 16px;font-size:16px;font-weight:700;
+    font-family:'Nunito',sans-serif;letter-spacing:.06em;text-transform:uppercase;
+    background:rgba(13,48,96,0.5);border:1.5px solid rgba(52,211,153,0.3);
+    border-radius:12px;color:#fff;text-align:center;margin-bottom:12px;
+    outline:none;transition:border-color .2s;
+  }
+  #code-input:focus{border-color:rgba(52,211,153,0.7)}
+  #code-input::placeholder{color:rgba(255,255,255,.25);text-transform:none;font-weight:600;letter-spacing:0}
+  #code-submit{
+    width:100%;padding:16px;font-size:16px;font-weight:800;
+    font-family:'Nunito',sans-serif;background:linear-gradient(135deg,#059669,#047857);
+    color:#fff;border:none;border-radius:12px;cursor:pointer;
+    transition:transform .15s,box-shadow .15s;
+    box-shadow:0 6px 24px rgba(5,150,105,.35);margin-bottom:12px;
+  }
+  #code-submit:hover{transform:translateY(-1px)}
+  #code-submit:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  #code-error{font-size:12px;color:#f87171;min-height:18px;margin-bottom:8px}
+  #code-buy{font-size:12px;color:rgba(52,211,153,0.55)}
+  #code-buy a{color:rgba(52,211,153,0.8);text-decoration:none}
+  #code-buy a:hover{text-decoration:underline}
   #combo-msg{position:absolute;top:90px;width:100%;text-align:center;font-size:18px;font-weight:800;color:#fbbf24;text-shadow:0 0 20px rgba(251,191,36,.6);pointer-events:none;opacity:0;transition:opacity .3s;z-index:20}
   #toast{position:absolute;bottom:80px;width:100%;text-align:center;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);pointer-events:none;z-index:20;opacity:0;transition:opacity .4s}
 </style>
@@ -54,6 +86,15 @@
     <div id="combo-msg"></div>
     <div id="toast"></div>
     <button id="mute-btn" onclick="toggleMute()">🔊</button>
+    <div id="code-overlay" style="display:none">
+      <div style="font-size:44px;margin-bottom:12px">🐋</div>
+      <h2>Zugangscode eingeben</h2>
+      <p>Du hast deinen Code per E-Mail erhalten,<br>nachdem du das Spiel gekauft hast.</p>
+      <input id="code-input" type="text" placeholder="z.B. TIMMY-A3F9-X7K2" maxlength="14" oninput="this.value=this.value.toUpperCase()">
+      <div id="code-error"></div>
+      <button id="code-submit" onclick="submitCode()">🎮 Spiel freischalten</button>
+      <p id="code-buy">Noch kein Code? <a href="/">Hier kaufen für 0,99 €</a></p>
+    </div>
   </div>
 </div>
 
@@ -875,9 +916,72 @@ function onTap(e) {
 cv.addEventListener('click', onTap);
 cv.addEventListener('touchstart', onTap, {passive:false});
 
+// ── CODE ENTRY ────────────────────────────────────────────
+function showCodeEntry() {
+  document.getElementById('code-overlay').style.display = 'flex';
+}
+
+async function submitCode() {
+  const input = document.getElementById('code-input');
+  const errEl = document.getElementById('code-error');
+  const btn = document.getElementById('code-submit');
+  const code = input.value.trim().toUpperCase();
+
+  if (!code || code.length < 10) {
+    errEl.textContent = 'Bitte gib deinen vollständigen Code ein.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Prüfe Code…';
+  errEl.textContent = '';
+
+  try {
+    const res = await fetch('/.netlify/functions/verify-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+
+    if (data.valid) {
+      localStorage.setItem('timmy_access', code);
+      document.getElementById('code-overlay').style.display = 'none';
+      // Start game
+      S = 'title'; fr = 0;
+      requestAnimationFrame(overlayLoop);
+    } else {
+      errEl.textContent = data.error || 'Ungültiger Code. Bitte prüfe deine E-Mail.';
+      btn.disabled = false;
+      btn.textContent = '🎮 Spiel freischalten';
+    }
+  } catch(e) {
+    errEl.textContent = 'Verbindungsfehler. Bitte versuche es nochmal.';
+    btn.disabled = false;
+    btn.textContent = '🎮 Spiel freischalten';
+  }
+}
+
+// Allow pressing Enter in code input
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('code-input');
+  if (input) {
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') submitCode(); });
+  }
+});
+
 // ── START ─────────────────────────────────────────────────
-S='title'; fr=0;
-requestAnimationFrame(overlayLoop);
+const savedCode = localStorage.getItem('timmy_access');
+if (savedCode) {
+  // Already has access – start game directly
+  S='title'; fr=0;
+  requestAnimationFrame(overlayLoop);
+} else {
+  // Show code entry
+  document.addEventListener('DOMContentLoaded', showCodeEntry);
+  // Fallback if DOM already loaded
+  if (document.readyState !== 'loading') showCodeEntry();
+}
 </script>
 </body>
 </html>
